@@ -1,0 +1,4 @@
+internal/*/*.md
+go.sum
+bin/
+tests/bin
