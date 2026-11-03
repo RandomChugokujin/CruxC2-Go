@@ -84,6 +84,9 @@ func (m* Manager) UnqueueTask(id string) (t *tasks.Task, ok bool){
 	if !found {
 		return nil, false
 	}
+	if len(session.TasksQueued) == 0 {
+		return nil, true
+	}
 	// Poping the task from TasksQueued
 	task := session.TasksQueued[0]
 	session.TasksQueued = session.TasksQueued[1:]
@@ -94,6 +97,7 @@ func (m* Manager) UnqueueTask(id string) (t *tasks.Task, ok bool){
 }
 
 type Session struct {
+	Hostname 		string
 	AgentID 		string
 	IPAddr 			string
 	Version 		string
@@ -106,6 +110,7 @@ type Session struct {
 }
 
 func (s *Session) PrintSession() {
+	fmt.Printf("Hostname:\t\t\t%s\n", s.Hostname)
 	fmt.Printf("Agent ID:\t\t\t%s\n", s.AgentID)
 	fmt.Printf("IP Address:\t\t\t%s\n", s.IPAddr)
 	fmt.Printf("Version:\t\t\t%s\n", s.Version)

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"time"
+
+	"github.com/RandomChugokujin/CruxC2/internal/id"
 )
 
 type Envelope struct {
@@ -26,7 +28,7 @@ func NewEnvelope(agent_id string, msg any) (Envelope, error){
     return Envelope{
         ProtocolVersion: "0.1.0",
         AgentID:         agent_id,
-        MessageID:       NewID(),
+        MessageID:       id.NewID(),
         Type:            shortTypeName(reflect.TypeOf(msg)),
         Timestamp:       time.Now(),
         Payload:         payload,

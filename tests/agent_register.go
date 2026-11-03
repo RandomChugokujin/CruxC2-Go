@@ -13,6 +13,7 @@ import (
 func main(){
 	agent_id := protocol.NewID()
 	payload := protocol.MsgAgentRegister {
+		Hostname: "SRV01",
 		AgentVersion: "0.1.0",
 		Platform: "Linux",
 		Architecture: "x86-64",

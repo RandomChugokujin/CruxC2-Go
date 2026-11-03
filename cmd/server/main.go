@@ -29,7 +29,9 @@ func main() {
 	fmt.Print(banner)
 
 	// Create C2 Manager
-	c2 := server.NewC2(sessions.NewManager())
+	sessionManager := sessions.NewManager()
+	c2 := server.NewC2(sessionManager)
+	listeners := newListenerRegistry()
 
 	fmt.Println("Welcome to CruxC2. Type *help* to get a list of available commands. Happy Hacking!")
 
@@ -37,7 +39,7 @@ func main() {
 	app := grumble.New(&grumble.Config{
 		Name:        "CruxC2",
 		Description: "C2 Server CLI",
-		Prompt:      "CruxC2> ",
+		Prompt:      defaultPrompt,
 	})
 
 	selectedAgentID := ""
@@ -46,7 +48,8 @@ func main() {
 		Name: "session",
 		Help: "Select an active agent session",
 		Run: func(c *grumble.Context) error {
-			choices, idsByChoice := sessionChoices(c2.List())
+			agents := c2.List()
+			choices, idsByChoice := sessionChoices(agents)
 			if len(choices) == 0 {
 				fmt.Println("No active agent sessions.")
 				return nil
@@ -67,7 +70,14 @@ func main() {
 			}
 
 			selectedAgentID = agentID
-			app.SetPrompt(fmt.Sprintf("CruxC2 [%s]> ", selectedAgentID))
+			selectedHostname := ""
+			for _, agent := range agents {
+				if agent.AgentID == agentID {
+					selectedHostname = agent.Hostname
+					break
+				}
+			}
+			app.SetPrompt(sessionPrompt(selectedHostname, selectedAgentID))
 			fmt.Printf("Selected session: %s\n", selectedAgentID)
 			return nil
 		},
@@ -78,6 +88,10 @@ func main() {
 		Help: "List all connect agents",
 		Run: func(c *grumble.Context) error {
 			sessions := c2.List()
+			if len(sessions) == 0 {
+				fmt.Print("No active agent sessions.\n")
+				return nil
+			}
 			fmt.Print("Currently Active Agents:\n\n")
 			for _, s := range sessions {
 				s.PrintSession()
@@ -87,17 +101,32 @@ func main() {
 	})
 	app.AddCommand(&grumble.Command{
 		Name: "agent_rm",
-		Help: "Disconnect an agent",
+		Help: "Remove an agent session",
 		Run: func(c *grumble.Context) error {
-			prompt := &survey.Select{
-				Message: "Select an agent to delete:",
-				Options: []string{"Agent 1", "Agent 2"},
+			choices, idsByChoice := sessionChoices(c2.List())
+			if len(choices) == 0 {
+				fmt.Println("No active agent sessions.")
+				return nil
 			}
-			var sel string
-			if err := survey.AskOne(prompt, &sel); err != nil {
+
+			prompt := &survey.Select{
+				Message: "Select an agent session to remove:",
+				Options: choices,
+			}
+			var selectedChoice string
+			if err := survey.AskOne(prompt, &selectedChoice); err != nil {
 				return err
 			}
-			fmt.Printf("Removing listener: %s\n", sel)
+
+			agentID, found := idsByChoice[selectedChoice]
+			if !found {
+				return fmt.Errorf("selected agent session %q is no longer available", selectedChoice)
+			}
+			if !removeAgentSession(sessionManager, &selectedAgentID, agentID, app.SetPrompt) {
+				return fmt.Errorf("agent session %q is no longer registered", agentID)
+			}
+
+			fmt.Printf("Removed agent session: %s\n", agentID)
 			return nil
 		},
 	})
@@ -115,17 +144,38 @@ func main() {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("ok\n"))
 			})
+			// Agent Register
 			mux.HandleFunc("POST /agent", c2.Register)
+			// Agent Task Poll
+			mux.HandleFunc("POST /poll", c2.TaskPoll)
+			// Agent Task Result submission
+			mux.HandleFunc("POST /result", c2.TaskSubmit)
 
-			listener := &http.Server{
-				Addr:    ":" + port,
-				Handler: mux,
+			listenerAddr, err := listeners.start(":"+port, mux)
+			if err != nil {
+				return fmt.Errorf("could not start HTTP listener on port %s: %w", port, err)
 			}
-			go listener.ListenAndServe()
-			fmt.Printf("Starting listener at port %s...\n", port)
+			fmt.Printf("Started HTTP listener on %s\n", listenerAddr)
 			return nil
 		},
 	})
+	app.AddCommand(&grumble.Command{
+		Name: "listener_list",
+		Help: "List running listeners",
+		Run: func(c *grumble.Context) error {
+			listener_str_arr := listeners.addresses()
+			if len(listener_str_arr) == 0 {
+				fmt.Println("No running listeners, use listener_start <PORT_NUM> to start one.")
+				return nil
+			}
+			fmt.Println("Running Listners:")
+			for index, addr := range listener_str_arr {
+				fmt.Printf("Listener %d: %s\n", index, addr)
+			}
+			return nil
+		},
+	})
+
 
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
