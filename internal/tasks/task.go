@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/RandomChugokujin/CruxC2/internal/id"
 )
@@ -37,14 +38,14 @@ type Task struct {
 }
 
 func (t Task) String() string {
-	task_str := ""
-	task_str += fmt.Sprintf("TaskID:\t%s\n", t.TaskID)
-	task_str += fmt.Sprintf("TaskType:\t%s\n", t.TaskType.String())
-	task_str += fmt.Sprintln("Params:")
+	var task_str strings.Builder
+	fmt.Fprintf(&task_str, "TaskID:\t%s\n", t.TaskID)
+	fmt.Fprintf(&task_str, "TaskType:\t%s\n", t.TaskType.String())
+	fmt.Fprintln(&task_str, "Params:")
 	for _, p  := range t.Params {
-		task_str += fmt.Sprintf("\t%s\n", p)
+		fmt.Fprintf(&task_str, "\t%s\n", p)
 	}
-	return task_str
+	return task_str.String()
 }
 
 func NewTask(tt TaskType, params *[]string) Task {

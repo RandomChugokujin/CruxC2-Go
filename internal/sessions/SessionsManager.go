@@ -16,7 +16,8 @@ type SessionManager interface {
     Remove(id string) bool
 	QueueTask(id string, task tasks.Task) bool
 	UnqueueTask(id string) (*tasks.Task, bool)
-//    SetState(id string, state SessionState)
+	FinishTask(session_id, task_id string) (task tasks.Task, ok bool)
+	// SetState(id string, state SessionState)
 }
 
 func NewManager() SessionManager {
@@ -94,6 +95,27 @@ func (m* Manager) UnqueueTask(id string) (t *tasks.Task, ok bool){
 	session.TasksExecuting = append(session.TasksExecuting, task)
 	// Returning
 	return &session.TasksExecuting[len(session.TasksExecuting)-1], true
+}
+
+func (m* Manager) FinishTask(session_id, task_id string) (task tasks.Task, ok bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	task = tasks.Task{}
+	session, found := m.sessions[session_id]
+	if !found {
+		return task, false
+	}
+	for index, cur_task := range session.TasksExecuting {
+		if cur_task.TaskID == task_id {
+			task = cur_task
+			// Delete found task
+			session.TasksExecuting = append(
+				session.TasksExecuting[:index],
+				session.TasksExecuting[index+1:]...)
+			return task, true
+		}
+	}
+	return task, false
 }
 
 type Session struct {

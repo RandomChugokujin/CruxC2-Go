@@ -29,7 +29,9 @@ func (tq *TaskQueue) Add(new_task *tasks.Task) bool {
 		return false
 	}
 	// Refuse to add TaskNone or TaskShutdown
-	if new_task.TaskType == tasks.TaskNone || new_task.TaskType == tasks.TaskShutdown {
+	if new_task.TaskType == tasks.TaskNone ||
+	new_task.TaskType == tasks.TaskShutdown ||
+	new_task.TaskType == tasks.TaskRegister {
 		return false
 	}
 	tq.task_queue[new_task.TaskID] = TaskTracker{
